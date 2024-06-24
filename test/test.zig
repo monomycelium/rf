@@ -42,8 +42,14 @@ fn testRailFenceDecode(
 
 test "encode" {
     try testRailFenceEncode("loremipsumdolorsitamet", "lmulieoeismoostmtrpdra", 3);
+    try testRailFenceEncode("XOXOXOXOXOXOXOXOXO", "XXXXXXXXXOOOOOOOOO", 2);
+    try testRailFenceEncode("WEAREDISCOVEREDFLEEATONCE", "WECRLTEERDSOEEFEAOCAIVDEN", 3);
+    try testRailFenceEncode("EXERCISES", "ESXIEECSR", 4);
 }
 
 test "decode" {
     try testRailFenceDecode("loremipsumdolorsitamet", "lmulieoeismoostmtrpdra", 3);
+    try testRailFenceDecode("THEDEVILISINTHEDETAILS", "TEITELHDVLSNHDTISEIIEA", 3);
+    try testRailFenceDecode("EXERCISMISAWESOME", "EIEXMSMESAORIWSCE", 5);
+    try testRailFenceDecode("112358132134558914423337761098715972584418167651094617711286", "133714114238148966225439541018335470986172518171757571896261", 6);
 }
