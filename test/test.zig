@@ -1,10 +1,14 @@
 const std = @import("std");
-const testing = std.testing;
+const rfc = @import("rail_fence_cipher");
 const c = @cImport({
     @cInclude("rail_fence_cipher.h");
 });
 
-fn testRailFenceEncode(
+const io = std.io;
+const List = std.ArrayList;
+const testing = std.testing;
+
+fn testRailFenceEncodeC(
     decoded: []const u8,
     encoded: []const u8,
     rails: usize,
@@ -22,7 +26,7 @@ fn testRailFenceEncode(
     alloc.free(result);
 }
 
-fn testRailFenceDecode(
+fn testRailFenceDecodeC(
     decoded: []const u8,
     encoded: []const u8,
     rails: usize,
@@ -38,6 +42,38 @@ fn testRailFenceDecode(
 
     try testing.expectEqualStrings(decoded, result);
     alloc.free(result);
+}
+
+fn testRailFenceEncode(
+    decoded: []const u8,
+    encoded: []const u8,
+    rails: usize,
+) !void {
+    const alloc = std.testing.allocator;
+
+    var out = try List(u8).initCapacity(alloc, decoded.len);
+    defer out.deinit();
+    const writer = out.writer();
+
+    try rfc.encode(decoded, rails, writer);
+    const result = out.items;
+    try testing.expectEqualStrings(encoded, result);
+}
+
+fn testRailFenceDecode(
+    decoded: []const u8,
+    encoded: []const u8,
+    rails: usize,
+) !void {
+    const alloc = std.testing.allocator;
+
+    var fbs = io.fixedBufferStream(encoded);
+    const reader = fbs.reader();
+    const buffer: []u8 = try alloc.alloc(u8, encoded.len);
+    defer alloc.free(buffer);
+
+    const result = try rfc.decode(reader, rails, buffer, encoded.len);
+    try testing.expectEqualStrings(decoded, result);
 }
 
 test "encode" {

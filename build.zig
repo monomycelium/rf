@@ -15,23 +15,11 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "rf",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/root.zig"),
+    const lib = b.addModule("rail_fence_cipher", .{
+        .root_source_file = b.path("src/rail_fence_cipher.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    lib.linkLibC();
-    lib.addIncludePath(b.path("src"));
-    lib.addCSourceFile(.{.file = b.path("src/rail_fence_cipher.c")});
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
         .name = "rf",
@@ -42,6 +30,7 @@ pub fn build(b: *std.Build) void {
 
     const clap = b.dependency("clap", .{});
     exe.root_module.addImport("clap", clap.module("clap"));
+    exe.root_module.addImport("rail_fence_cipher", lib);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -83,6 +72,8 @@ pub fn build(b: *std.Build) void {
     lib_unit_tests.linkLibC();
     lib_unit_tests.addIncludePath(b.path("src"));
     lib_unit_tests.addCSourceFile(.{.file = b.path("src/rail_fence_cipher.c")});
+    lib_unit_tests.root_module.addImport("rail_fence_cipher", lib);
+    
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     const exe_unit_tests = b.addTest(.{
