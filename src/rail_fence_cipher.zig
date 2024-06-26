@@ -45,6 +45,9 @@ pub fn decode(reader: anytype, key: usize, buffer: []u8, length: ?usize) ![]u8 {
     outer: for (0..key) |i| {
         var data_index: usize = i;
 
+        // TODO: do not refer to buffer.len, as it may be larger than the
+        // encoded data! instead, make `length` non-optional.
+
         if (i == 0 or i == key - 1) {
             while (data_index < buffer.len) : (data_index += increment) {
                 buffer[data_index] = reader.readByte() catch |e| if (e == error.NoEofError) break :outer else return e;

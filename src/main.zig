@@ -8,7 +8,9 @@ const io = std.io;
 const fs = std.fs;
 
 pub fn main() !void {
-    const alloc = std.heap.raw_c_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
 
     const params = comptime clap.parseParamsComptime(
         \\-h, --help            Display this help and exit.
@@ -43,12 +45,38 @@ pub fn main() !void {
         std.debug.print("{s}{s}", .{arg, if (i == res.positionals.len - 1) "\n" else ", "});
 
     for (res.positionals) |arg| {
-        const file: fs.File = fs.cwd().openFile(arg, .{.mode = .read_write}) catch |err| {
-            log.err("failed to open file: {any}\n", .{err});
-            continue;
-        };
-        defer file.close();
-        // TODO: change mode dynamically
-        // TODO: do stuff
+        const stdin: bool = std.mem.eql(u8, arg, "-");
+        const stdout: bool = res.args.stdout != 0 or stdin;
+
+        const input: fs.File = if (stdin) std.io.getStdIn()
+            else fs.cwd().openFile(arg, .{.mode = if (stdout) .read_only else .read_write}) catch |err| {
+                log.err("failed to open input: {any}\n", .{err});
+                continue;
+            };
+        defer if (!stdin) input.close();
+        const output: fs.File = if (stdout) std.io.getStdOut() else input;
+
+        if (res.args.decode == 0) { // encode
+            const size: u64 = input.getEndPos() catch |e| switch (e) {
+                error.Unseekable => 0,
+                else => return e,
+            };
+            if (size > std.math.maxInt(usize)) return error.FileTooBig;
+
+            const buf: []u8 = try input.readToEndAllocOptions(alloc, std.math.maxInt(usize), @truncate(size), @alignOf(u8), null);
+            defer alloc.free(buf);
+
+            var buffered = std.io.bufferedWriter(output.writer());
+            const writer = buffered.writer();
+            if (!stdout) try output.seekTo(0);
+            defer buffered.flush();
+
+            try rfc.encode(buf, res.args.rails.?, writer);
+        } else { // decode
+            var buffered = std.io.bufferedReader(output.reader());
+            const reader = buffered.reader();
+            
+            // TODO: implement calling decode function.
+        }
     }
 }
