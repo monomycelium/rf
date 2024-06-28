@@ -25,37 +25,34 @@ pub fn encode(data: []const u8, key: usize, writer: anytype) !void {
     }
 }
 
-/// Decrypt data read from `reader` using `key` rails in Rail Fence Cipher,
-/// writing decoded data to `buffer`. If not null, `length` bytes would be read.
-pub fn decode(reader: anytype, key: usize, buffer: []u8, length: ?usize) ![]u8 {
+/// Decrypt `length` bytes read from `reader` using `key` rails in Rail Fence Cipher,
+/// writing decoded data to `buffer`.
+pub fn decode(reader: anytype, key: usize, buffer: []u8, length: usize) ![]u8 {
     if (key == 0) return error.InvalidKey;
-    if (key == 1 or (length orelse key + 1) <= key) {
-        const n = if (length) |l| try reader.readAtLeast(buffer, l) else try reader.readAll(buffer);
+    if (key == 1 or length <= key) {
+        const n = try reader.readAtLeast(buffer, length);
 
         var buf: []u8 = undefined;
         buf.ptr = buffer.ptr;
-        buf.len = @max(n, length orelse n);
+        buf.len = @min(n, length);
 
         return buf;
     }
-    
+
     const increment: usize = 2 * (key - 1);
     var count: usize = 0;
 
     outer: for (0..key) |i| {
         var data_index: usize = i;
 
-        // TODO: do not refer to buffer.len, as it may be larger than the
-        // encoded data! instead, make `length` non-optional.
-
         if (i == 0 or i == key - 1) {
-            while (data_index < buffer.len) : (data_index += increment) {
+            while (data_index < length) : (data_index += increment) {
                 buffer[data_index] = reader.readByte() catch |e| if (e == error.NoEofError) break :outer else return e;
                 count += 1;
             }
         } else {
             var previous_increment: usize = 2 * i;
-            while (data_index < buffer.len) { 
+            while (data_index < length) { 
                 buffer[data_index] = reader.readByte() catch |e| if (e == error.NoEofError) break :outer else return e;
                 count += 1;
                 previous_increment = increment - previous_increment;
