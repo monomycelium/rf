@@ -42,11 +42,10 @@ pub fn main() !void {
         const stdin: bool = std.mem.eql(u8, arg, "-");
         const stdout: bool = res.args.stdout != 0 or stdin;
 
-        const input: fs.File = if (stdin) std.io.getStdIn()
-            else fs.cwd().openFile(arg, .{.mode = if (stdout) .read_only else .read_write}) catch |err| {
-                log.err("failed to open input: {any}\n", .{err});
-                continue;
-            };
+        const input: fs.File = if (stdin) std.io.getStdIn() else fs.cwd().openFile(arg, .{ .mode = if (stdout) .read_only else .read_write }) catch |err| {
+            log.err("failed to open input: {any}\n", .{err});
+            continue;
+        };
         defer if (!stdin) input.close();
         const output: fs.File = if (stdout) std.io.getStdOut() else input;
 
