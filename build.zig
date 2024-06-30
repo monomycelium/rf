@@ -3,7 +3,7 @@ const std = @import("std");
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -21,8 +21,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // forgive the mess
+    const env: ?[]u8 = std.process.getEnvVarOwned(b.allocator, "RELEASE_VERSION") catch null;
+    defer if (env) |e| b.allocator.free(e);
+
+    const printed: []u8 = if (env) |e| try std.fmt.allocPrint(b.allocator, "rf-{s}-{s}-{s}", .{ e, @tagName(target.result.cpu.arch), @tagName(target.result.os.tag) }) else try b.allocator.dupe(u8, "rf");
+    defer b.allocator.free(printed);
+
     const exe = b.addExecutable(.{
-        .name = "rf",
+        .name = printed,
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
