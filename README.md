@@ -20,8 +20,10 @@ To decrypt the file, run the same command, appending "-d" to the arguments.
 
 Encrypt to a file from console input using 3 rails:
 ``` console
-$ rf -r3 > /path/to/new_file
+$ rf -r3 - > /path/to/new_file
 three
+$ cat /path/to/new_file
+teher
 ```
 
 After inputting data, press `Ctrl+d` twice instead of hitting enter.

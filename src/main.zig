@@ -35,7 +35,7 @@ pub fn main() !void {
 
     if (res.args.help != 0)
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
-    if (res.args.rails == null)
+    if (res.args.rails == null or res.positionals.len == 0)
         return clap.usage(std.io.getStdErr().writer(), clap.Help, &params);
 
     for (res.positionals) |arg| {
@@ -43,7 +43,7 @@ pub fn main() !void {
         const stdout: bool = res.args.stdout != 0 or stdin;
 
         const input: fs.File = if (stdin) std.io.getStdIn() else fs.cwd().openFile(arg, .{ .mode = if (stdout) .read_only else .read_write }) catch |err| {
-            log.err("failed to open input: {any}\n", .{err});
+            log.err("failed to open input `{s}`: {any}\n", .{ if (stdin) "stdin" else arg, err});
             continue;
         };
         defer if (!stdin) input.close();
@@ -66,24 +66,25 @@ pub fn main() !void {
 
             try rfc.encode(buf, res.args.rails.?, writer);
         } else { // decode
-            const s: ?u64 = input.getEndPos() catch |e| switch (e) {
-                error.Unseekable => null,
+            const size: u64 = input.getEndPos() catch |e| switch (e) {
+                error.Unseekable => 0,
                 else => return e,
             };
-            if (s orelse 0 > std.math.maxInt(usize)) return error.FileTooBig;
+            if (size > std.math.maxInt(usize)) return error.FileTooBig;
 
             var out: ?[]u8 = null;
             var ret: []u8 = undefined;
             defer if (out) |r| alloc.free(r);
 
-            if (s) |size| {
+            if (size > 0) {
                 var buffered = std.io.bufferedReader(input.reader());
                 const reader = buffered.reader();
 
-                out = try alloc.alloc(u8, size);
+                out = try alloc.alloc(u8, @truncate(size));
                 ret = try rfc.decode(reader, res.args.rails.?, out.?, out.?.len);
             } else {
                 const buf: []u8 = try input.readToEndAllocOptions(alloc, std.math.maxInt(usize), null, @alignOf(u8), null);
+                defer alloc.free(buf);
                 var fbs = std.io.fixedBufferStream(buf);
                 const reader = fbs.reader();
 
