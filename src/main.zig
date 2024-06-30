@@ -3,7 +3,6 @@ const clap = @import("clap");
 const rfc = @import("rail_fence_cipher");
 
 const log = std.log;
-const debug = std.debug;
 const io = std.io;
 const fs = std.fs;
 
@@ -39,11 +38,6 @@ pub fn main() !void {
     if (res.args.rails == null)
         return clap.usage(std.io.getStdErr().writer(), clap.Help, &params);
 
-    std.debug.print("rails: {}\n", .{res.args.rails.?});
-    std.debug.print("files to {s}: ", .{if (res.args.decode == 0) "encode" else "decode"});
-    for (res.positionals, 0..) |arg, i|
-        std.debug.print("{s}{s}", .{arg, if (i == res.positionals.len - 1) "\n" else ", "});
-
     for (res.positionals) |arg| {
         const stdin: bool = std.mem.eql(u8, arg, "-");
         const stdout: bool = res.args.stdout != 0 or stdin;
@@ -69,14 +63,37 @@ pub fn main() !void {
             var buffered = std.io.bufferedWriter(output.writer());
             const writer = buffered.writer();
             if (!stdout) try output.seekTo(0);
-            defer buffered.flush();
+            defer buffered.flush() catch undefined;
 
             try rfc.encode(buf, res.args.rails.?, writer);
         } else { // decode
-            var buffered = std.io.bufferedReader(output.reader());
-            const reader = buffered.reader();
-            
-            // TODO: implement calling decode function.
+            const s: ?u64 = input.getEndPos() catch |e| switch (e) {
+                error.Unseekable => null,
+                else => return e,
+            };
+            if (s orelse 0 > std.math.maxInt(usize)) return error.FileTooBig;
+
+            var out: ?[]u8 = null;
+            var ret: []u8 = undefined;
+            defer if (out) |r| alloc.free(r);
+
+            if (s) |size| {
+                var buffered = std.io.bufferedReader(input.reader());
+                const reader = buffered.reader();
+
+                out = try alloc.alloc(u8, size);
+                ret = try rfc.decode(reader, res.args.rails.?, out.?, out.?.len);
+            } else {
+                const buf: []u8 = try input.readToEndAllocOptions(alloc, std.math.maxInt(usize), null, @alignOf(u8), null);
+                var fbs = std.io.fixedBufferStream(buf);
+                const reader = fbs.reader();
+
+                out = try alloc.alloc(u8, buf.len);
+                ret = try rfc.decode(reader, res.args.rails.?, out.?, out.?.len);
+            }
+
+            if (!stdout) try output.seekTo(0);
+            try output.writeAll(ret);
         }
     }
 }
