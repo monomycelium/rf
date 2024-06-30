@@ -1,5 +1,8 @@
 name: Continuous Deployment
 
+permissions:
+  contents: write
+  
 on:
   push:
     tags:
